@@ -1,125 +1,160 @@
 ---
 name: editable-visual-assets
-description: Create or revise structured, editable visual assets for ChatGPT conversations, especially when the user asks for editable SVG, layered/separable image components, PowerPoint-ready graphics, Figma-ready artwork, diagrams, scientific illustrations, icons, flowcharts, or visuals whose parts must remain independently movable, recolorable, replaceable, or editable. Prefer native SVG primitives and semantic groups over flattened raster images; use transparent raster assets only for elements that are genuinely unsuitable for vector representation.
+description: Create or revise structured, editable visual assets for ChatGPT conversations, especially when the user asks for editable SVG, layered or separable image components, PowerPoint-ready graphics, Figma-ready artwork, scientific illustrations, diagrams, icons, flowcharts, or visuals whose parts must remain independently movable, recolorable, replaceable, or editable. Prefer native text, PowerPoint-native shapes, and semantic SVG over flattened raster images; isolate genuinely complex visual content as separate transparent raster objects.
 ---
 
 # Editable Visual Assets
 
 ## Goal
 
-Produce visuals as editable structure, not merely as a flattened picture. Preserve semantic objects, text, geometry, and reusable components so downstream tools such as PowerPoint, Figma, Inkscape, or a coding agent can modify individual parts.
+Produce editable visual structure rather than a flattened picture. Preserve semantic objects, text, geometry, and reusable assets so PowerPoint, Figma, Inkscape, or Codex can modify individual parts.
 
-## Workflow
+## Core workflow
 
-1. Classify the request before creating visual output.
-2. Plan a scene manifest with semantic objects and stable IDs.
-3. Route each object to the most editable representation that can preserve the requested appearance.
-4. Create the vector scene and per-object assets.
-5. Validate the manifest and SVG bundle.
-6. Hand off structured assets plus a preview or raster-only components when needed.
+1. Plan `scene_manifest.json` with stable semantic object IDs before creating the final composition.
+2. Route every object to the most editable representation that preserves the required appearance.
+3. Author SVG fragments and native-object metadata; isolate only genuinely complex imagery as raster objects.
+4. Validate the manifest with `scripts/validate_manifest.py`.
+5. Build `scene.svg` plus tightly cropped `objects/<id>.svg` files with `scripts/build_svg_bundle.py`.
+6. For PowerPoint work, dry-run and reconstruct with `scripts/powerpoint_reconstruct.py`.
+7. Visually inspect and edit named objects rather than regenerating the whole scene.
 
-Read `references/scene-manifest.md` for the required object model. Read `references/svg-authoring.md` before authoring SVG. Read `references/ppt-handoff.md` when the target is PowerPoint or another slide editor.
+Read `references/scene-manifest.md` for the object model. Read `references/svg-authoring.md` before writing SVG. Read `references/image-generation-layering.md` before using image generation. Read `references/ppt-handoff.md` when PowerPoint is a target.
 
-## Representation decision tree
+## Representation priority
 
-Use the following priority order for every object:
+Choose the first representation that is visually sufficient:
 
-1. **Native text**: Keep labels, titles, captions, equations, and editable copy as text metadata. Do not convert text to paths unless the user explicitly requests outlined lettering.
-2. **Native geometry / PPT shape**: Use semantic rectangles, rounded rectangles, circles, ellipses, lines, connectors, arrows, polygons, and other simple primitives when they express the object accurately.
-3. **Semantic SVG**: Use grouped SVG primitives and compact paths for icons, diagrams, scientific apparatus, logos, molecules, stylized objects, and flat illustrations.
-4. **Transparent raster object**: Use an independently generated transparent raster asset only for objects whose required appearance depends on texture, painterly detail, photorealism, or geometry that would be impractical to represent as editable SVG.
-5. **Flattened raster scene**: Use only when the user explicitly prioritizes a single final image over editability.
+1. `native_text` for titles, labels, captions, equations, and other copy.
+2. `ppt_shape` for rectangles, rounded rectangles, ellipses, lines, arrows, chevrons, and similar geometry when the destination is PowerPoint.
+3. `svg` for icons, diagrams, apparatus, molecules, logos, technical schematics, and flat illustrations.
+4. `transparent_raster` only for semantic objects whose appearance materially depends on texture, painterly detail, photorealism, or otherwise impractical vector geometry.
+5. Flatten the full scene only when the user explicitly prefers a single final image over editability.
 
-Never flatten the whole scene merely because one object requires raster rendering. Keep vector and raster representations mixed in the same manifest.
+Never flatten the whole scene merely because one object requires raster rendering.
 
-## Scene planning
+## Scene planning rules
 
-Before authoring files, define a logical canvas and object tree. Assign every editable item:
+Assign every editable object:
 
-- a stable lowercase `id` using letters, digits, hyphens, or underscores;
-- a short human-readable `label`;
-- a semantic `type`;
-- `editable_as`: `native_text`, `ppt_shape`, `svg`, or `transparent_raster`;
-- a bounding box `[x, y, width, height]` in canvas coordinates;
-- a `z_index`;
-- a concise description of its visual role.
+- stable lowercase `id` matching `^[a-z0-9][a-z0-9_-]*$`;
+- human-readable `label`;
+- semantic `type`;
+- `editable_as`;
+- `[x, y, width, height]` `bbox` in canvas coordinates;
+- `z_index`;
+- concise `description`.
 
-Keep backgrounds, main subjects, connectors/arrows, labels, and decorative elements separate whenever the user could reasonably want to move, recolor, replace, hide, or delete them later.
+Use `parent_id` when semantic grouping helps later reasoning. Keep backgrounds, main subjects, connectors, labels, and decorative elements separate whenever a user could reasonably want to move, recolor, replace, hide, or delete them later.
 
-## SVG-native creation
+## SVG-native branch
 
-For diagrammatic, scientific, icon-like, infographic, and slide-illustration requests, prefer SVG-native creation instead of image generation.
+Prefer SVG-native creation for scientific figures, diagrams, icon-like art, process schematics, infographics, and slide illustrations.
 
-Create:
+Author SVG-capable objects in full-canvas coordinates through `svg_fragment`. Keep native text and PowerPoint shapes authoritative in their structured metadata while optionally supplying `svg_fragment` for the composed preview.
 
-- `scene_manifest.json`
-- `scene.svg`
-- `objects/<id>.svg` for each SVG-capable object
-
-Author `svg_fragment` for SVG-capable objects in canvas coordinates. Then run:
+Run:
 
 ```bash
 python scripts/validate_manifest.py scene_manifest.json
 python scripts/build_svg_bundle.py scene_manifest.json --out output
 ```
 
-Use `scripts/build_svg_bundle.py` rather than hand-splitting the final scene when possible. The script preserves semantic IDs and writes both the composed SVG and independent object SVG files.
+Do not hand-split a full-scene SVG when the builder can produce semantic object assets. Per-object SVGs must be tightly cropped to the object's `bbox`; a full-slide transparent selection box is a defect.
 
-## Complex illustration branch
+## Complex image-generation branch
 
-If an object genuinely requires image generation, keep that object isolated from the rest of the scene.
+Use image generation only for the smallest meaningful semantic object that actually needs raster detail.
 
-- Generate the smallest meaningful semantic object, not the entire scene.
-- Prefer transparent background for isolated assets.
-- Keep text, arrows, labels, charts, diagrams, and simple geometry outside the raster object.
-- Record the asset as `transparent_raster` in the scene manifest.
-- Preserve its intended bounding box and z-order so it can be placed later by PowerPoint/Figma/Codex.
-- If the environment cannot both generate the raster asset and finish the structured bundle in one turn, preserve the manifest first and continue the raster-object generation in a subsequent turn rather than flattening the scene.
+Before invoking image generation:
 
-Do not claim that an image-generation model exposes internal layers or paths unless the tool actually provides them.
+1. Record the object in the manifest as `transparent_raster`.
+2. Give it an `asset` path and `asset_prompt`.
+3. Keep all ordinary text, arrows, labels, diagrams, charts, and simple geometry outside the raster object.
+4. Request an isolated object with transparent background when supported.
+5. Reuse one style signature across sibling raster objects.
+
+If the image tool does not expose layers, masks, or vector paths, treat the generated image as one raster object and do not claim otherwise. If image generation ends the response before bundling can continue, preserve the manifest first and continue from that asset in a later turn. Never compensate by flattening the whole composition.
+
+## PowerPoint reconstruction
+
+For a PowerPoint-ready result, run the SVG builder first, then:
+
+```bash
+python scripts/powerpoint_reconstruct.py output/scene_manifest.json --assets-dir output --dry-run
+```
+
+On Windows with Microsoft PowerPoint and `pywin32`, reconstruct into the visible active presentation:
+
+```powershell
+py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --slide 1 --replace-existing
+```
+
+The reconstruction script maps:
+
+- `native_text` -> native PowerPoint text box;
+- `ppt_shape` -> native PowerPoint shape/line/arrow;
+- `svg` -> independently selectable SVG object;
+- `transparent_raster` -> independently selectable transparent raster object.
+
+Every inserted PowerPoint shape is named with the manifest `id`. Prefer deterministic manifest updates plus `--replace-existing` for repeatable changes, and use Computer Use for subjective visual adjustments when the user wants to watch front-end editing.
 
 ## Editing existing structured visuals
 
-When the user asks to modify an existing scene:
+When the user requests a change:
 
-1. Reuse existing object IDs.
-2. Change only the affected objects unless the requested change requires reflow.
+1. Reuse existing IDs.
+2. Modify only affected objects unless reflow is necessary.
 3. Preserve unrelated geometry and styling.
-4. Regenerate `scene.svg` and affected `objects/*.svg` from the updated manifest.
+4. Rebuild affected assets and `scene.svg`.
 5. Validate again.
+6. In PowerPoint, replace only objects with matching IDs or manipulate the named objects directly.
 
 Examples:
 
-- "Move the GNN block to the center" -> change the object's geometry/transform, not the whole image.
-- "Make the CO2 arrow gray and dashed" -> edit the arrow object only.
-- "Remove the cloud" -> remove or hide that semantic object.
-- "Change the title" -> modify native text metadata, not vector outlines.
+- "Move the GNN block to the center" -> update that object's `bbox` or native placement.
+- "Make the CO2 arrow gray and dashed" -> update only its `shape` and preview fragment.
+- "Remove the cloud" -> remove/hide only that semantic object.
+- "Change the title" -> update `text`, not outlined vector glyphs.
 
 ## Output contract
 
-For a complete editable visual bundle, provide:
+A complete bundle should contain:
 
-- `scene_manifest.json` as the source of truth;
-- `scene.svg` as the composed vector representation when vector content exists;
-- `objects/` containing independent reusable SVG objects;
-- any raster-only objects as separate transparent files rather than embedded into one flattened image;
-- a short note identifying which parts remain fully editable and which parts are raster-only.
+```text
+output/
+  scene_manifest.json
+  scene.svg
+  objects/
+    <semantic-object>.svg
+  raster/
+    <raster-only-object>.png
+```
 
-For PowerPoint-oriented work, follow `references/ppt-handoff.md`.
+Deliver `scene_manifest.json` as the source of truth. Identify any raster-only parts explicitly. Keep independent assets suitable for direct insertion into PowerPoint/Figma; do not embed a full-scene PNG inside SVG as a fake vector result.
 
 ## Quality rules
 
-- Prefer semantic SVG elements (`text`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`) over long paths when equivalent.
+- Prefer semantic SVG primitives (`text`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`) over long paths when equivalent.
 - Group related primitives under one stable `<g id="...">`.
 - Keep SVG IDs unique and meaningful.
-- Avoid embedding a full-scene PNG inside SVG as a fake vector result.
-- Avoid converting ordinary text into paths.
-- Avoid thousands of tiny tracing paths for flat artwork when a compact semantic approximation is possible.
-- Keep gradients, filters, masks, and clip paths only when materially useful and compatible with the target editor.
-- Preserve a sensible `viewBox`.
-- Keep object ordering deterministic by `z_index`.
-- Validate before delivery.
+- Preserve text as text whenever editability matters.
+- Avoid thousands of tiny tracing paths for flat artwork.
+- Keep filters, masks, clip paths, gradients, and blend effects only when materially useful and compatible with the destination editor.
+- Preserve deterministic z-order.
+- Validate XML and manifest structure before delivery.
+- When PowerPoint is the target, keep each semantic SVG's viewBox tight to its visible object.
 
-## Scope boundaries
+## Verification
 
-This skill defines editable visual structure and asset generation. It does not itself promise perfect conversion of arbitrary photorealistic images into semantic vector art. For highly detailed raster imagery, favor separate transparent raster layers plus editable vector overlays.
+Run the bundled self-test after modifying scripts or the manifest schema:
+
+```bash
+python scripts/self_test.py
+```
+
+The self-test verifies manifest validation, SVG generation/XML parsing, tight per-object viewBoxes, asset resolution, and a PowerPoint dry-run plan.
+
+## Scope boundary
+
+Do not promise perfect semantic vectorization of arbitrary photorealistic images. For high-detail imagery, preserve separate transparent raster layers plus editable vector/text overlays rather than misrepresenting auto-traced paths as meaningful editable structure.

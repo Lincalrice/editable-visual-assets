@@ -1,34 +1,25 @@
 # Scene Manifest Specification
 
-## Contents
-
-- Purpose
-- Required fields
-- Object fields
-- SVG object fields
-- Raster object fields
-- Example
-
 ## Purpose
 
-`scene_manifest.json` is the source of truth for editable visual composition. It describes layout, semantics, editability, z-order, and the relationship between reusable assets.
+`scene_manifest.json` is the source of truth for editable visual composition. Version 2 adds explicit PowerPoint-native shape metadata, target slide hints, rotation/opacity, and parent relationships while remaining compatible with version 1 bundles.
 
-## Required fields
+## Top-level fields
 
 ```json
 {
-  "version": 1,
-  "canvas": {
-    "width": 1600,
-    "height": 900
+  "version": 2,
+  "canvas": {"width": 1600, "height": 900, "unit": "px"},
+  "target": {
+    "powerpoint": {"slide_width_in": 13.333333, "slide_height_in": 7.5}
   },
   "objects": []
 }
 ```
 
-Canvas width and height must be positive numbers.
+`canvas.width` and `canvas.height` must be positive. `canvas.unit` may be `px` or `pt`; geometry is always mapped proportionally to the destination slide. `target.powerpoint` is a dry-run/default hint only: when a real presentation is open, its actual slide dimensions are authoritative.
 
-## Object fields
+## Common object fields
 
 Every object must contain:
 
@@ -44,37 +35,19 @@ Every object must contain:
 }
 ```
 
-Allowed `editable_as` values:
+Allowed `editable_as` values are `native_text`, `ppt_shape`, `svg`, and `transparent_raster`.
 
-- `native_text`
-- `ppt_shape`
-- `svg`
-- `transparent_raster`
+Optional common fields:
+
+- `rotation`: degrees clockwise.
+- `opacity`: 0 to 1. Preserve in the manifest even if the downstream editor cannot reproduce it exactly.
+- `parent_id`: semantic parent/group ID. Use for reasoning and future regrouping; do not require PowerPoint grouping to succeed.
 
 IDs must match `^[a-z0-9][a-z0-9_-]*$` and be unique.
 
-## SVG object fields
+## Native text
 
-SVG-capable objects should provide `svg_fragment` in canvas coordinates. The fragment may contain one element or a group of elements. Do not include an outer `<svg>` element.
-
-```json
-{
-  "id": "co2_arrow",
-  "label": "CO2 flow",
-  "type": "connector",
-  "editable_as": "svg",
-  "bbox": [420, 330, 220, 60],
-  "z_index": 30,
-  "description": "Flow arrow between process blocks",
-  "svg_fragment": "<line x1=\"430\" y1=\"360\" x2=\"610\" y2=\"360\" stroke=\"#667085\" stroke-width=\"8\"/><polygon points=\"610,360 585,344 585,376\" fill=\"#667085\"/>"
-}
-```
-
-The builder wraps this fragment in `<g id="co2_arrow">`.
-
-## Native text fields
-
-Keep editable text in the manifest even if an SVG preview also includes it.
+Keep authoritative text outside vector paths:
 
 ```json
 {
@@ -90,17 +63,68 @@ Keep editable text in the manifest even if an SVG preview also includes it.
     "font_family": "Arial",
     "font_size": 42,
     "font_weight": 600,
-    "fill": "#111827"
+    "italic": false,
+    "fill": "#111827",
+    "align": "center",
+    "vertical_align": "middle"
   },
-  "svg_fragment": "<text x=\"240\" y=\"96\" font-family=\"Arial\" font-size=\"42\" font-weight=\"600\" fill=\"#111827\">Machine-learning-assisted solvent screening</text>"
+  "svg_fragment": "<text x=\"800\" y=\"96\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"42\" fill=\"#111827\">Machine-learning-assisted solvent screening</text>"
 }
 ```
 
-The text field remains authoritative for downstream slide reconstruction.
+`text` is authoritative for PowerPoint reconstruction. `svg_fragment` is only the preview representation.
 
-## Raster object fields
+## Native PowerPoint shapes
 
-Raster objects must remain separate assets.
+Use `ppt_shape` when PowerPoint can represent the object directly. Supported v2 shape kinds are:
+
+- `rectangle`
+- `rounded_rectangle`
+- `ellipse`
+- `line`
+- `arrow`
+- `chevron`
+
+Example:
+
+```json
+{
+  "id": "flow_arrow",
+  "label": "Flow arrow",
+  "type": "connector",
+  "editable_as": "ppt_shape",
+  "bbox": [420, 330, 220, 60],
+  "z_index": 30,
+  "description": "Native PowerPoint connector",
+  "shape": {
+    "kind": "arrow",
+    "points": [[430, 360], [610, 360]],
+    "stroke": "#667085",
+    "stroke_width": 8,
+    "dash": "solid"
+  },
+  "svg_fragment": "<line x1=\"430\" y1=\"360\" x2=\"585\" y2=\"360\" stroke=\"#667085\" stroke-width=\"8\"/><polygon points=\"610,360 580,342 580,378\" fill=\"#667085\"/>"
+}
+```
+
+For filled native shapes, use `fill` and `stroke` values in `#RRGGBB` format or `none`. `stroke_width` is expressed in canvas units. `dash` may use `solid`, `square_dot`, `round_dot`, `dash`, `dash_dot`, `dash_dot_dot`, `long_dash`, or `long_dash_dot`.
+
+## SVG objects
+
+SVG-capable objects may provide `svg_fragment` in full-canvas coordinates. Do not include an outer `<svg>` element.
+
+The bundle builder wraps the fragment in a semantic group and writes two forms:
+
+- full-canvas placement inside `scene.svg`;
+- a tightly cropped `objects/<id>.svg` whose `viewBox` equals the object's `bbox`.
+
+The tight per-object SVG is important for PowerPoint: the selection box should match the object rather than the entire slide.
+
+An SVG object may instead provide `asset` when an externally authored SVG should be used as-is.
+
+## Transparent raster objects
+
+Use only for semantic objects that genuinely need texture, painterly detail, photorealism, or other non-vector appearance:
 
 ```json
 {
@@ -111,29 +135,13 @@ Raster objects must remain separate assets.
   "bbox": [1030, 170, 420, 590],
   "z_index": 40,
   "description": "Detailed transparent reactor rendering",
-  "asset": "raster/hero_reactor.png"
+  "asset": "raster/hero_reactor.png",
+  "asset_prompt": "isolated detailed reactor, transparent background, no text"
 }
 ```
 
-Do not embed the entire scene as one raster asset.
+Keep raster objects independent. Never embed the entire composition in one raster merely because one element needs raster rendering.
 
-## Example
+## Preview fragments
 
-```json
-{
-  "version": 1,
-  "canvas": {"width": 1600, "height": 900},
-  "objects": [
-    {
-      "id": "database",
-      "label": "Database",
-      "type": "icon",
-      "editable_as": "svg",
-      "bbox": [100, 280, 180, 180],
-      "z_index": 10,
-      "description": "Source data icon",
-      "svg_fragment": "<ellipse cx=\"190\" cy=\"315\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/><rect x=\"120\" y=\"315\" width=\"140\" height=\"90\" fill=\"#EAF4FB\" stroke=\"#3B82B6\" stroke-width=\"4\"/><ellipse cx=\"190\" cy=\"405\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/>"
-    }
-  ]
-}
-```
+`svg_fragment` may be included for `native_text` and `ppt_shape` objects to make `scene.svg` a useful visual preview. The native metadata remains authoritative for reconstruction.

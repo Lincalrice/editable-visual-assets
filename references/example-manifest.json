@@ -1,8 +1,15 @@
 {
-  "version": 1,
+  "version": 2,
   "canvas": {
     "width": 1600,
-    "height": 900
+    "height": 900,
+    "unit": "px"
+  },
+  "target": {
+    "powerpoint": {
+      "slide_width_in": 13.333333,
+      "slide_height_in": 7.5
+    }
   },
   "objects": [
     {
@@ -16,14 +23,37 @@
       "svg_fragment": "<ellipse cx=\"190\" cy=\"315\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/><rect x=\"120\" y=\"315\" width=\"140\" height=\"90\" fill=\"#EAF4FB\" stroke=\"#3B82B6\" stroke-width=\"4\"/><ellipse cx=\"190\" cy=\"405\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/>"
     },
     {
+      "id": "ml_model",
+      "label": "ML model",
+      "type": "process_block",
+      "editable_as": "ppt_shape",
+      "bbox": [650, 285, 300, 150],
+      "z_index": 15,
+      "description": "Native PowerPoint model block",
+      "shape": {
+        "kind": "rounded_rectangle",
+        "fill": "#EAF4FB",
+        "stroke": "#3B82B6",
+        "stroke_width": 4
+      },
+      "svg_fragment": "<rect x=\"650\" y=\"285\" width=\"300\" height=\"150\" rx=\"24\" fill=\"#EAF4FB\" stroke=\"#3B82B6\" stroke-width=\"4\"/>"
+    },
+    {
       "id": "co2_arrow",
       "label": "CO2 flow",
       "type": "connector",
       "editable_as": "ppt_shape",
-      "bbox": [330, 330, 210, 60],
+      "bbox": [330, 330, 250, 60],
       "z_index": 20,
-      "description": "Editable flow connector",
-      "svg_fragment": "<line x1=\"340\" y1=\"360\" x2=\"500\" y2=\"360\" stroke=\"#667085\" stroke-width=\"8\"/><polygon points=\"520,360 492,342 492,378\" fill=\"#667085\"/>"
+      "description": "Editable native PowerPoint flow arrow",
+      "shape": {
+        "kind": "arrow",
+        "points": [[340, 360], [560, 360]],
+        "stroke": "#667085",
+        "stroke_width": 8,
+        "dash": "solid"
+      },
+      "svg_fragment": "<line x1=\"340\" y1=\"360\" x2=\"535\" y2=\"360\" stroke=\"#667085\" stroke-width=\"8\"/><polygon points=\"560,360 530,340 530,380\" fill=\"#667085\"/>"
     },
     {
       "id": "title",
@@ -38,9 +68,11 @@
         "font_family": "Arial",
         "font_size": 42,
         "font_weight": 600,
-        "fill": "#111827"
+        "fill": "#111827",
+        "align": "center",
+        "vertical_align": "middle"
       },
-      "svg_fragment": "<text x=\"260\" y=\"100\" font-family=\"Arial\" font-size=\"42\" font-weight=\"600\" fill=\"#111827\">Machine-learning-assisted solvent screening</text>"
+      "svg_fragment": "<text x=\"800\" y=\"100\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"42\" font-weight=\"600\" fill=\"#111827\">Machine-learning-assisted solvent screening</text>"
     }
   ]
 }

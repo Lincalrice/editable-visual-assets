@@ -1,19 +1,28 @@
 # Editable Visual Assets
 
-A ChatGPT Skill for producing editable visual structure instead of flattened images.
+A ChatGPT Skill for generating **structured visual assets instead of flattened images**, with a practical handoff to Microsoft PowerPoint.
 
-It is designed for requests such as:
+## What v2 does
 
-- "Make this scientific illustration editable in PowerPoint."
-- "Generate an SVG where I can move each part separately."
-- "Create PPT-ready artwork with separate objects, labels, and arrows."
-- "Keep the text editable and export each icon as a separate SVG."
+```text
+Chat request
+   -> scene_manifest.json
+   -> native text / native PPT shapes / semantic SVG / isolated raster objects
+   -> validate_manifest.py
+   -> build_svg_bundle.py
+   -> scene.svg + tightly-cropped objects/*.svg
+   -> powerpoint_reconstruct.py
+   -> independently selectable objects in visible PowerPoint
+```
 
-## Core idea
+Typical requests:
 
-The skill plans a semantic `scene_manifest.json`, routes each object to the most editable representation, and produces a composed SVG plus independent object SVGs. Complex visual elements may remain separate transparent raster assets rather than forcing the whole composition into a flattened image.
+- "Make a scientific illustration I can edit in PowerPoint."
+- "Generate an SVG where I can move each subsystem separately."
+- "Keep the labels editable and export the apparatus as separate SVGs."
+- "Use image generation only for the detailed reactor, not for the text and arrows."
 
-## Structure
+## Repository structure
 
 ```text
 editable-visual-assets/
@@ -22,18 +31,36 @@ editable-visual-assets/
   scripts/
     validate_manifest.py
     build_svg_bundle.py
+    powerpoint_reconstruct.py
+    self_test.py
   references/
     scene-manifest.md
     svg-authoring.md
+    image-generation-layering.md
     ppt-handoff.md
     example-manifest.json
 ```
 
-## Local test
+## Test the portable pipeline
+
+```bash
+python scripts/self_test.py
+```
+
+## Build an asset bundle
 
 ```bash
 python scripts/validate_manifest.py references/example-manifest.json
-python scripts/build_svg_bundle.py references/example-manifest.json --out /tmp/editable-visual-demo
+python scripts/build_svg_bundle.py references/example-manifest.json --out output
+python scripts/powerpoint_reconstruct.py output/scene_manifest.json --assets-dir output --dry-run
 ```
 
-The intended installation artifact is the validated `skill.zip` produced by the official ChatGPT skill packaging utility.
+## Reconstruct in PowerPoint on Windows
+
+Install `pywin32`, open PowerPoint, then:
+
+```powershell
+py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --slide 1 --replace-existing
+```
+
+PowerPoint remains visible. Inserted objects are named after their manifest IDs so Codex/Computer Use or a human can select and modify the intended element directly.
