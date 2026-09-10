@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 1600,
+    "height": 900
+  },
+  "objects": [
+    {
+      "id": "database",
+      "label": "Database",
+      "type": "icon",
+      "editable_as": "svg",
+      "bbox": [100, 280, 180, 180],
+      "z_index": 10,
+      "description": "Source data icon",
+      "svg_fragment": "<ellipse cx=\"190\" cy=\"315\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/><rect x=\"120\" y=\"315\" width=\"140\" height=\"90\" fill=\"#EAF4FB\" stroke=\"#3B82B6\" stroke-width=\"4\"/><ellipse cx=\"190\" cy=\"405\" rx=\"70\" ry=\"22\" fill=\"#D9EAF7\" stroke=\"#3B82B6\" stroke-width=\"4\"/>"
+    },
+    {
+      "id": "co2_arrow",
+      "label": "CO2 flow",
+      "type": "connector",
+      "editable_as": "ppt_shape",
+      "bbox": [330, 330, 210, 60],
+      "z_index": 20,
+      "description": "Editable flow connector",
+      "svg_fragment": "<line x1=\"340\" y1=\"360\" x2=\"500\" y2=\"360\" stroke=\"#667085\" stroke-width=\"8\"/><polygon points=\"520,360 492,342 492,378\" fill=\"#667085\"/>"
+    },
+    {
+      "id": "title",
+      "label": "Title",
+      "type": "text",
+      "editable_as": "native_text",
+      "bbox": [260, 50, 1080, 80],
+      "z_index": 100,
+      "description": "Editable title",
+      "text": "Machine-learning-assisted solvent screening",
+      "text_style": {
+        "font_family": "Arial",
+        "font_size": 42,
+        "font_weight": 600,
+        "fill": "#111827"
+      },
+      "svg_fragment": "<text x=\"260\" y=\"100\" font-family=\"Arial\" font-size=\"42\" font-weight=\"600\" fill=\"#111827\">Machine-learning-assisted solvent screening</text>"
+    }
+  ]
+}
