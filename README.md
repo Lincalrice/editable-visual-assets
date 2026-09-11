@@ -2,12 +2,13 @@
 
 A ChatGPT Skill for generating **structured visual assets instead of flattened images**, with a practical handoff to Microsoft PowerPoint.
 
-## What v2 does
+## What v2.1 does
 
 ```text
 Chat request
    -> scene_manifest.json
    -> native text / native PPT shapes / semantic SVG / isolated raster objects
+   -> optional capability-gated sub-agent image jobs
    -> validate_manifest.py
    -> build_svg_bundle.py
    -> scene.svg + tightly-cropped objects/*.svg
@@ -66,6 +67,8 @@ python scripts/extract_image_jobs.py scene_manifest.json --out image_jobs.json
 ```
 
 The Skill treats sub-agent image generation as capability-gated: use delegation only when the current ChatGPT Work/Codex surface can spawn a worker, that worker can generate images, and the returned asset is accessible to the parent. Otherwise apply the manifest fallback and keep the parent as slide orchestrator.
+
+Delegation is for context isolation, parallelism, and specialization rather than token savings. Keep native text, PowerPoint shapes, SVG, trivial icons, and simple edits in the parent workflow.
 
 ## Reconstruct in PowerPoint on Windows
 
