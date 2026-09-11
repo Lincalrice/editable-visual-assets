@@ -10,6 +10,9 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 EDITABLE_AS = {"native_text", "ppt_shape", "svg", "transparent_raster"}
 REQUIRED_OBJECT_KEYS = {"id", "label", "type", "editable_as", "bbox", "z_index", "description"}
 PPT_SHAPES = {"rectangle", "rounded_rectangle", "ellipse", "line", "arrow", "chevron"}
+GEN_DISPATCH = {"delegate_preferred", "parent_only", "manual"}
+GEN_FALLBACK = {"parent", "preserve_placeholder", "manual"}
+GEN_STATUS = {"planned", "generated", "failed", "manual"}
 
 
 def fail(messages):
@@ -120,13 +123,47 @@ def validate_manifest(data):
         if editable_as == "svg" and not isinstance(obj.get("svg_fragment"), str) and not isinstance(obj.get("asset"), str):
             errors.append(f"{prefix} svg objects need svg_fragment or asset")
 
-        if editable_as == "transparent_raster" and not isinstance(obj.get("asset"), str):
-            errors.append(f"{prefix}.asset is required for transparent_raster")
+        if editable_as == "transparent_raster":
+            if not isinstance(obj.get("asset"), str):
+                errors.append(f"{prefix}.asset is required for transparent_raster")
+            if "asset_prompt" in obj and not isinstance(obj.get("asset_prompt"), str):
+                errors.append(f"{prefix}.asset_prompt must be a string when provided")
+            generation = obj.get("generation")
+            if generation is not None:
+                if not isinstance(generation, dict):
+                    errors.append(f"{prefix}.generation must be an object")
+                else:
+                    dispatch = generation.get("dispatch", "delegate_preferred")
+                    fallback = generation.get("fallback", "parent")
+                    status = generation.get("status", "planned")
+                    if dispatch not in GEN_DISPATCH:
+                        errors.append(f"{prefix}.generation.dispatch must be one of {sorted(GEN_DISPATCH)}")
+                    if fallback not in GEN_FALLBACK:
+                        errors.append(f"{prefix}.generation.fallback must be one of {sorted(GEN_FALLBACK)}")
+                    if status not in GEN_STATUS:
+                        errors.append(f"{prefix}.generation.status must be one of {sorted(GEN_STATUS)}")
+                    if "style_signature" in generation and not isinstance(generation.get("style_signature"), str):
+                        errors.append(f"{prefix}.generation.style_signature must be a string")
+                    anchors = generation.get("anchor_ids", [])
+                    if not isinstance(anchors, list) or not all(isinstance(v, str) for v in anchors):
+                        errors.append(f"{prefix}.generation.anchor_ids must be an array of strings")
+                    forbidden = generation.get("forbidden_content", [])
+                    if not isinstance(forbidden, list) or not all(isinstance(v, str) for v in forbidden):
+                        errors.append(f"{prefix}.generation.forbidden_content must be an array of strings")
 
     for index, obj in enumerate(objects):
-        parent_id = obj.get("parent_id") if isinstance(obj, dict) else None
+        if not isinstance(obj, dict):
+            continue
+        parent_id = obj.get("parent_id")
         if parent_id and parent_id not in seen:
             errors.append(f"objects[{index}].parent_id references unknown id: {parent_id}")
+        generation = obj.get("generation") if isinstance(obj.get("generation"), dict) else None
+        if generation:
+            for anchor_id in generation.get("anchor_ids", []):
+                if anchor_id not in seen:
+                    errors.append(f"objects[{index}].generation.anchor_ids references unknown id: {anchor_id}")
+                if anchor_id == obj.get("id"):
+                    errors.append(f"objects[{index}].generation.anchor_ids must not reference itself")
 
     return errors
 
