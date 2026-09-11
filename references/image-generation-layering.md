@@ -44,3 +44,9 @@ Repeat the same signature for every separately generated object. Vary only the s
 ## Fallback vectorization
 
 Vectorize a raster object only when the artwork is already flat, low-color, and shape-like. If tracing creates excessive micro-paths or loses semantics, keep the raster object separate instead of pretending it is meaningfully editable SVG.
+
+## Delegation during live PowerPoint editing
+
+When the parent agent is actively maintaining a PowerPoint slide, use `references/subagent-image-delegation.md` for complex raster-only objects. Delegation is preferred only when the host supports sub-agents **and** the delegated worker can use image generation and return an accessible asset. Otherwise use the manifest fallback.
+
+Treat delegation as a context-preservation and parallelism optimization, not as a requirement for every image. Native text, PowerPoint shapes, SVG, trivial icons, and simple visual edits should stay in the parent workflow.
