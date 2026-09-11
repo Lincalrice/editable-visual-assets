@@ -32,11 +32,13 @@ editable-visual-assets/
     validate_manifest.py
     build_svg_bundle.py
     powerpoint_reconstruct.py
+    extract_image_jobs.py
     self_test.py
   references/
     scene-manifest.md
     svg-authoring.md
     image-generation-layering.md
+    subagent-image-delegation.md
     ppt-handoff.md
     example-manifest.json
 ```
@@ -54,6 +56,16 @@ python scripts/validate_manifest.py references/example-manifest.json
 python scripts/build_svg_bundle.py references/example-manifest.json --out output
 python scripts/powerpoint_reconstruct.py output/scene_manifest.json --assets-dir output --dry-run
 ```
+
+## Optional image-job delegation
+
+For complex raster-only objects during live PowerPoint editing, extract minimal generation packets:
+
+```bash
+python scripts/extract_image_jobs.py scene_manifest.json --out image_jobs.json
+```
+
+The Skill treats sub-agent image generation as capability-gated: use delegation only when the current ChatGPT Work/Codex surface can spawn a worker, that worker can generate images, and the returned asset is accessible to the parent. Otherwise apply the manifest fallback and keep the parent as slide orchestrator.
 
 ## Reconstruct in PowerPoint on Windows
 
