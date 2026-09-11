@@ -1,86 +1,82 @@
 # PowerPoint Handoff
 
-## Goal
+## Purpose
 
-Reconstruct the scene as independently selectable PowerPoint objects while keeping the PowerPoint window visible for Codex/Computer Use inspection and manual intervention.
+Use this guidance when editable visual assets must be reconstructed in Microsoft PowerPoint while preserving independently selectable objects.
 
-## Object mapping
+## Preferred object mapping
 
-| Manifest representation | PowerPoint result |
-| --- | --- |
-| `native_text` | Native text box |
-| `ppt_shape` | Native PowerPoint AutoShape or line/arrow |
-| `svg` | Independent SVG picture object |
-| `transparent_raster` | Independent transparent raster picture |
+Map manifest objects to PowerPoint using this priority:
 
-Semantic editability is the priority. An imported SVG is one selectable PowerPoint object by default; its internal SVG paths are still present in the SVG asset and can be converted/ungrouped in PowerPoint when needed. Keep commonly moved units as separate SVG files rather than one full-scene SVG.
+- `native_text` -> native PowerPoint text box.
+- `ppt_shape` -> native PowerPoint shape, line, or arrow.
+- `svg` -> independently inserted SVG object.
+- `transparent_raster` -> independently inserted transparent raster object.
 
-## Build and validate
+Do not flatten a full slide merely because one object is raster-only.
 
-From the skill directory:
+## Naming and identity
+
+Use the manifest `id` as the PowerPoint Shape name whenever possible. Stable names allow deterministic replacement and make Computer Use/Codex instructions more reliable.
+
+Examples:
+
+- `title`
+- `co2_arrow`
+- `absorption_tower`
+- `hero_reactor`
+
+When replacing an object, target the existing PowerPoint Shape with the same name instead of rebuilding unrelated slide content.
+
+## Reconstruction workflow
+
+1. Validate `scene_manifest.json`.
+2. Build `scene.svg` and independent SVG assets.
+3. Ensure all required raster assets exist.
+4. Run a PowerPoint dry-run:
 
 ```bash
-python scripts/validate_manifest.py scene_manifest.json
-python scripts/build_svg_bundle.py scene_manifest.json --out output
 python scripts/powerpoint_reconstruct.py output/scene_manifest.json --assets-dir output --dry-run
 ```
 
-The builder creates tightly cropped SVG files under `output/objects/`, so PowerPoint selection boxes stay close to the visible artwork.
-
-## Windows reconstruction
-
-Install the Windows COM dependency once:
+5. On Windows with PowerPoint open, reconstruct into the visible presentation:
 
 ```powershell
-py -m pip install pywin32
+py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --slide 1 --replace-existing
 ```
 
-Open the desired presentation in Microsoft PowerPoint, leave it visible, then run:
+6. Keep PowerPoint visible for visual inspection and manual/Computer Use refinement.
+7. Save only after the user or workflow requests it.
 
-```powershell
-py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --slide 3 --replace-existing
-```
+## SVG behavior in PowerPoint
 
-To open a presentation explicitly:
+Treat each semantic SVG file as one independently selectable object at insertion time. If the user needs to edit internal SVG paths as Office shapes, use PowerPoint's SVG-to-shape conversion workflow when available. Do not assume every SVG primitive automatically becomes a separate Office Shape on insertion.
 
-```powershell
-py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --ppt "C:\path\deck.pptx" --slide 3 --replace-existing --save
-```
+For this reason, split semantically independent elements into separate SVG files before insertion rather than relying on later ungrouping.
 
-To append a blank slide:
+## Raster behavior
 
-```powershell
-py scripts\powerpoint_reconstruct.py output\scene_manifest.json --assets-dir output --new-slide --save
-```
+A raster asset should correspond to exactly one semantic visual object. Keep its background transparent where supported. Do not bake editable labels, arrows, captions, or page background into the raster object.
 
-The script keeps PowerPoint visible and names each inserted shape with its manifest `id`. Re-running with `--replace-existing` replaces only matching scene objects rather than rebuilding unrelated slide content.
+## Positioning
 
-## Codex / Computer Use workflow
+Manifest geometry is specified in canvas coordinates and is mapped proportionally to the destination slide. When an actual presentation is open, its real page size is authoritative over any manifest slide-size hint.
 
-Prefer this sequence when the user wants to watch edits happen:
+## Visual QA
 
-1. Open PowerPoint and navigate to the target slide.
-2. Build/validate the asset bundle in the project terminal.
-3. Run `powerpoint_reconstruct.py` against the active presentation.
-4. Keep PowerPoint in the foreground after insertion.
-5. Use Computer Use for visual judgement: spacing, hierarchy, alignment, crop, and aesthetic adjustments.
-6. For later deterministic changes, update the manifest and rerun with `--replace-existing`; for subjective tweaks, manipulate the named PowerPoint objects directly.
+After reconstruction, inspect:
 
-Do not silently regenerate the presentation with a separate PPTX library when the user explicitly asked to watch PowerPoint-front-end editing.
+- whether object bounds match visible content;
+- whether SVG selection boxes are tight;
+- whether transparent PNG edges are clean;
+- whether text remains native and editable;
+- whether z-order is correct;
+- whether arrows/connectors align with the intended semantic targets;
+- whether any object was accidentally duplicated during replacement;
+- whether raster elements visually match the slide's style anchor.
 
-## Recommended bundle
+## Image generation while the slide is live
 
-```text
-output/
-  scene_manifest.json
-  scene.svg
-  objects/
-    database.svg
-    apparatus.svg
-  raster/
-    detailed_reactor.png
-```
+Keep the parent agent responsible for the live slide and `scene_manifest.json`. If a complex isolated raster object is needed, follow `subagent-image-delegation.md`: capability-check the host, extract a minimal image job, delegate only that object when supported, wait for the returned asset, then replace/insert the named PowerPoint object. Do not let a delegated worker redesign the whole slide.
 
-## Anti-patterns
-
-Avoid full-slide PNGs, SVGs that only embed a full-slide PNG, outlined ordinary text, arrow labels baked into raster art, huge transparent SVG canvases around tiny objects, and automatic tracing that produces thousands of meaningless paths for simple flat geometry.
+Use at most two concurrent raster jobs by default. Establish a style anchor before parallel sibling generation when visual consistency matters. If delegation or delegated image generation is unavailable, apply the object's manifest fallback without flattening the slide.
