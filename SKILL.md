@@ -19,7 +19,7 @@ Produce editable visual structure rather than a flattened picture. Preserve sema
 6. For PowerPoint work, dry-run and reconstruct with `scripts/powerpoint_reconstruct.py`.
 7. Visually inspect and edit named objects rather than regenerating the whole scene.
 
-Read `references/scene-manifest.md` for the object model. Read `references/svg-authoring.md` before writing SVG. Read `references/image-generation-layering.md` before using image generation. Read `references/ppt-handoff.md` when PowerPoint is a target.
+Read `references/scene-manifest.md` for the object model. Read `references/svg-authoring.md` before writing SVG. Read `references/image-generation-layering.md` before using image generation. Read `references/subagent-image-delegation.md` when image generation occurs during a live PowerPoint/editable-slide workflow. Read `references/ppt-handoff.md` when PowerPoint is a target.
 
 ## Representation priority
 
@@ -75,6 +75,14 @@ Before invoking image generation:
 5. Reuse one style signature across sibling raster objects.
 
 If the image tool does not expose layers, masks, or vector paths, treat the generated image as one raster object and do not claim otherwise. If image generation ends the response before bundling can continue, preserve the manifest first and continue from that asset in a later turn. Never compensate by flattening the whole composition.
+
+### Sub-agent delegation during live slide editing
+
+When PowerPoint or another live editable slide surface is the main task, preserve the parent agent as the slide orchestrator. For a complex `transparent_raster` object, prefer delegating only that bounded image-generation job **if and only if** the current host exposes sub-agents and the delegated worker can generate an image and return an asset accessible to the parent.
+
+Do not assume delegation exists merely because this Skill requests it. If the capability is unavailable, use the object's `generation.fallback` policy. Never make sub-agent availability a hard dependency for the entire slide workflow.
+
+Use `scripts/extract_image_jobs.py` to produce minimal object-scoped job packets before delegation. Follow `references/subagent-image-delegation.md` for capability checks, context isolation, style anchors, concurrency, return contracts, and reintegration. Default to at most two concurrent image jobs and generate a shared style anchor before dispatching anchor-dependent siblings.
 
 ## PowerPoint reconstruction
 
@@ -153,7 +161,7 @@ Run the bundled self-test after modifying scripts or the manifest schema:
 python scripts/self_test.py
 ```
 
-The self-test verifies manifest validation, SVG generation/XML parsing, tight per-object viewBoxes, asset resolution, and a PowerPoint dry-run plan.
+The self-test verifies manifest validation, SVG generation/XML parsing, tight per-object viewBoxes, asset resolution, image-job delegation metadata, negative schema cases, and a PowerPoint dry-run plan.
 
 ## Scope boundary
 
