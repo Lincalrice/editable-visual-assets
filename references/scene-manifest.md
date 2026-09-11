@@ -145,3 +145,52 @@ Keep raster objects independent. Never embed the entire composition in one raste
 ## Preview fragments
 
 `svg_fragment` may be included for `native_text` and `ppt_shape` objects to make `scene.svg` a useful visual preview. The native metadata remains authoritative for reconstruction.
+
+## Raster generation and delegation metadata
+
+A `transparent_raster` object may include an optional `generation` object. This metadata expresses preference and state; it does not guarantee that the current ChatGPT/Codex surface exposes a compatible sub-agent.
+
+```json
+{
+  "id": "hero_reactor",
+  "label": "Detailed reactor illustration",
+  "type": "illustration",
+  "editable_as": "transparent_raster",
+  "bbox": [1030, 170, 420, 590],
+  "z_index": 40,
+  "description": "Detailed transparent reactor rendering",
+  "asset": "raster/hero_reactor.png",
+  "asset_prompt": "isolated detailed reactor, transparent background, no text",
+  "generation": {
+    "dispatch": "delegate_preferred",
+    "fallback": "parent",
+    "status": "planned",
+    "style_signature": "clean scientific editorial illustration; restrained blue-gray materials; soft isometric perspective",
+    "anchor_ids": [],
+    "forbidden_content": ["text", "labels", "arrows", "full-slide background"]
+  }
+}
+```
+
+Allowed `generation.dispatch` values:
+
+- `delegate_preferred`: delegate only if the host and delegated worker expose the required image/file capabilities.
+- `parent_only`: keep image generation in the parent thread.
+- `manual`: do not invoke image generation automatically.
+
+Allowed `generation.fallback` values:
+
+- `parent`: parent agent generates the isolated object when delegation is unavailable.
+- `preserve_placeholder`: preserve the unresolved manifest object and do not claim final completion.
+- `manual`: leave the job explicitly unresolved for a human/external tool.
+
+Allowed `generation.status` values:
+
+- `planned`
+- `generated`
+- `failed`
+- `manual`
+
+`style_signature` is a concise reusable style description. `anchor_ids` is an array of object IDs that should visually anchor this generation job. `forbidden_content` is an array of strings describing content that must not be baked into the raster asset.
+
+Do not set `status: generated` unless the referenced asset actually exists or an accessible returned asset reference has been received.
