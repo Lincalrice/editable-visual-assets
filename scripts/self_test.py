@@ -11,6 +11,7 @@ EXAMPLE = ROOT / "references" / "example-manifest.json"
 VALIDATOR = ROOT / "scripts" / "validate_manifest.py"
 BUILDER = ROOT / "scripts" / "build_svg_bundle.py"
 PPT = ROOT / "scripts" / "powerpoint_reconstruct.py"
+JOBS = ROOT / "scripts" / "extract_image_jobs.py"
 
 
 def run(*args):
@@ -48,7 +49,56 @@ def main():
         if not database_plan.get("asset_exists"):
             raise SystemExit("PowerPoint dry-run could not resolve database.svg")
 
-    print("PASS: editable visual assets v2 pipeline self-test")
+        delegated_manifest = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+        delegated_manifest["objects"].append({
+            "id": "hero_reactor",
+            "label": "Detailed reactor",
+            "type": "illustration",
+            "editable_as": "transparent_raster",
+            "bbox": [1100, 180, 320, 480],
+            "z_index": 40,
+            "description": "Complex raster-only reactor",
+            "asset": "raster/hero_reactor.png",
+            "asset_prompt": "isolated reactor, transparent background, no text",
+            "generation": {
+                "dispatch": "delegate_preferred",
+                "fallback": "parent",
+                "status": "planned",
+                "style_signature": "clean scientific editorial illustration",
+                "anchor_ids": ["database"],
+                "forbidden_content": ["text", "labels", "arrows"]
+            }
+        })
+        delegated_path = Path(tmp) / "delegated.json"
+        delegated_path.write_text(json.dumps(delegated_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        run(VALIDATOR, delegated_path)
+        jobs_path = Path(tmp) / "image_jobs.json"
+        run(JOBS, delegated_path, "--out", jobs_path)
+        jobs = json.loads(jobs_path.read_text(encoding="utf-8"))["jobs"]
+        if len(jobs) != 1 or jobs[0]["object_id"] != "hero_reactor":
+            raise SystemExit(f"unexpected image job extraction: {jobs}")
+        if jobs[0]["dispatch"] != "delegate_preferred" or jobs[0]["fallback"] != "parent":
+            raise SystemExit("image delegation metadata was not preserved")
+        if "database" not in jobs[0]["anchor_ids"]:
+            raise SystemExit("style anchor was not preserved in job packet")
+
+        invalid = json.loads(delegated_path.read_text(encoding="utf-8"))
+        invalid["objects"][-1]["generation"]["dispatch"] = "always_spawn"
+        invalid_path = Path(tmp) / "invalid_generation.json"
+        invalid_path.write_text(json.dumps(invalid, ensure_ascii=False, indent=2), encoding="utf-8")
+        bad = subprocess.run([sys.executable, str(VALIDATOR), str(invalid_path)], text=True, capture_output=True)
+        if bad.returncode == 0 or "generation.dispatch" not in bad.stderr:
+            raise SystemExit("validator did not reject invalid generation.dispatch")
+
+        invalid_anchor = json.loads(delegated_path.read_text(encoding="utf-8"))
+        invalid_anchor["objects"][-1]["generation"]["anchor_ids"] = ["missing_anchor"]
+        invalid_anchor_path = Path(tmp) / "invalid_anchor.json"
+        invalid_anchor_path.write_text(json.dumps(invalid_anchor, ensure_ascii=False, indent=2), encoding="utf-8")
+        bad_anchor = subprocess.run([sys.executable, str(VALIDATOR), str(invalid_anchor_path)], text=True, capture_output=True)
+        if bad_anchor.returncode == 0 or "anchor_ids references unknown id" not in bad_anchor.stderr:
+            raise SystemExit("validator did not reject unknown generation anchor")
+
+    print("PASS: editable visual assets v2.1 pipeline self-test")
 
 
 if __name__ == "__main__":
